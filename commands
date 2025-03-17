@@ -1,0 +1,183 @@
+Step-by-Step Kubernetes (K8s) Installation and Working
+We will go through the installation of Kubernetes on a Linux system (Ubuntu 22.04) and understand how it works with a simple deployment.
+
+1. Prerequisites
+Before installing Kubernetes, ensure you have:
+✅ Minimum 2GB RAM per node (Master & Worker).
+✅ 2 or more CPUs.
+✅ Linux OS (Ubuntu 20.04/22.04).
+✅ Root or sudo privileges.
+✅ Internet connection.
+
+2. Install Kubernetes Components
+Kubernetes requires three main tools on all nodes (Master & Worker):
+🔹 kubeadm – To initialize and manage the cluster.
+🔹 kubelet – Runs Kubernetes pods and services.
+🔹 kubectl – CLI to manage the cluster.
+
+Step 1: Update System
+bash
+Copy
+Edit
+sudo apt update && sudo apt upgrade -y
+Step 2: Disable Swap
+Kubernetes doesn’t work well with swap enabled.
+
+bash
+Copy
+Edit
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab  # Make it permanent
+Step 3: Load Kernel Modules
+bash
+Copy
+Edit
+sudo modprobe overlay
+sudo modprobe br_netfilter
+Step 4: Set Kernel Parameters
+bash
+Copy
+Edit
+cat <<EOF | sudo tee /etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sudo sysctl --system
+Step 5: Install Container Runtime (Docker or containerd)
+Install Docker
+bash
+Copy
+Edit
+sudo apt install -y docker.io
+sudo systemctl enable docker && sudo systemctl start docker
+Install containerd (Alternative to Docker)
+bash
+Copy
+Edit
+sudo apt install -y containerd
+sudo systemctl enable containerd && sudo systemctl start containerd
+Step 6: Install kubeadm, kubelet, and kubectl
+bash
+Copy
+Edit
+sudo apt install -y apt-transport-https ca-certificates curl
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt update
+sudo apt install -y kubeadm kubelet kubectl
+sudo systemctl enable kubelet
+3. Set Up Kubernetes Cluster
+Step 7: Initialize the Kubernetes Master Node
+Run this command on the Master Node:
+
+bash
+Copy
+Edit
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16
+After successful execution, you'll see a kubeadm join command. Copy it as it will be used to add worker nodes.
+
+Step 8: Configure kubectl for the Master Node
+bash
+Copy
+Edit
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Verify installation:
+
+bash
+Copy
+Edit
+kubectl get nodes
+It should show the Master Node in a "NotReady" state.
+
+4. Install Pod Network (CNI Plugin)
+Kubernetes requires a network plugin to enable communication between pods.
+
+Install Calico (Recommended)
+bash
+Copy
+Edit
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+OR
+
+Install Flannel (Alternative)
+bash
+Copy
+Edit
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+Check the nodes again:
+
+bash
+Copy
+Edit
+kubectl get nodes
+Now, the Master Node should be in the Ready state.
+
+5. Add Worker Nodes to the Cluster
+Run the kubeadm join command from Step 7 on each Worker Node:
+
+bash
+Copy
+Edit
+sudo kubeadm join <MASTER-IP>:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH>
+Verify:
+
+bash
+Copy
+Edit
+kubectl get nodes
+Now, both Master and Worker Nodes should be in the Ready state.
+
+6. Deploy a Test Application
+Now that Kubernetes is set up, let's deploy a simple Nginx application.
+
+Step 9: Deploy Nginx Pod
+bash
+Copy
+Edit
+kubectl create deployment nginx --image=nginx
+Step 10: Expose the Application
+bash
+Copy
+Edit
+kubectl expose deployment nginx --type=NodePort --port=80
+Check the Service:
+
+bash
+Copy
+Edit
+kubectl get svc
+Access the application using:
+
+bash
+Copy
+Edit
+curl http://<NODE-IP>:<PORT>
+How Kubernetes Works
+Now that Kubernetes is running, let’s break down how it functions:
+
+Cluster: A Kubernetes cluster consists of a Master Node and multiple Worker Nodes.
+Master Node Components:
+API Server: Manages all Kubernetes resources.
+Controller Manager: Handles replication and state maintenance.
+Scheduler: Assigns Pods to Nodes.
+etcd: Stores cluster data.
+Worker Node Components:
+Kubelet: Runs Pods on the node.
+Container Runtime: Runs the application containers (Docker, containerd).
+Kube Proxy: Handles networking between Pods.
+Pod & Deployment:
+A Pod is the smallest deployable unit.
+A Deployment manages the scaling and lifecycle of Pods.
+Service: Exposes applications internally or externally.
+Conclusion
+🎯 Now you have a working Kubernetes cluster!
+✔ Master and Worker nodes are connected.
+✔ Pods can be created and scaled.
+✔ Applications can be accessed via Services.
+
+Would you like help with Helm, Ingress, or monitoring setup?
